@@ -1,7 +1,8 @@
-import { Avatar, Box, Button, IconButton, Paper, Stack, Typography } from '@mui/material';
+import { Avatar, Box, Button, IconButton, Paper, Stack, Typography, InputBase } from '@mui/material';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import SendIcon from '@mui/icons-material/Send';
 import { useEffect, useRef, useState } from 'react';
 
 export type ChatMessage = {
@@ -119,12 +120,26 @@ const getBadgeStyle = (badge?: string) => {
   };
 };
 
+const formatSeconds = (seconds: number): string => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  if (h > 0) {
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+  return `${pad(m)}:${pad(s)}`;
+};
+
 export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const [visibleMessages, setVisibleMessages] = useState<ChatMessage[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [inputMessage, setInputMessage] = useState('');
 
   // スクロール位置の監視
   const handleScroll = () => {
@@ -202,6 +217,30 @@ export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelPr
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim()) return;
+
+    const currentSeconds = Math.floor(currentTime || 0);
+    const newMessage: ChatMessage = {
+      timestampSec: currentSeconds,
+      timestampText: formatSeconds(currentSeconds),
+      message: inputMessage.trim(),
+      username: 'あなた',
+      userIcon: undefined,
+    };
+
+    onChatFileLoad([...messages, newMessage]);
+    setInputMessage('');
+    setAutoScroll(true);
+  };
+
+  const handleKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSendMessage();
+    }
   };
 
   return (
@@ -455,22 +494,38 @@ export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelPr
           gap: 1,
         }}
       >
-        <Avatar sx={{ width: 24, height: 24 }}>Y</Avatar>
-        <Box
+        <Avatar sx={{ width: 24, height: 24 }}>あ</Avatar>
+        <InputBase
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="チャットを送信..."
           sx={{
             flex: 1,
             p: 1,
             borderRadius: 1,
             backgroundColor: 'action.hover',
-            color: 'text.secondary',
             fontSize: '0.875rem',
+            '& .MuiInputBase-input': {
+              color: 'text.primary',
+            },
           }}
-        >
-          チャットを送信...
-        </Box>
-        <IconButton size="small">
-          <SentimentSatisfiedAltIcon fontSize="small" />
-        </IconButton>
+        />
+        <Stack direction="row" spacing={1}>
+          <IconButton size="small">
+            <SentimentSatisfiedAltIcon fontSize="small" />
+          </IconButton>
+          <IconButton 
+            size="small" 
+            onClick={handleSendMessage}
+            disabled={!inputMessage.trim()}
+            sx={{
+              color: inputMessage.trim() ? 'primary.main' : 'text.disabled',
+            }}
+          >
+            <SendIcon fontSize="small" />
+          </IconButton>
+        </Stack>
       </Box>
     </Paper>
   );

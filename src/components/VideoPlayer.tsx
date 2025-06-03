@@ -1,5 +1,5 @@
-import { Box, Button, Paper } from '@mui/material';
-import { useRef, useState } from 'react';
+import { Box, Button, Paper, Typography } from '@mui/material';
+import { useRef, useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 
 type VideoPlayerProps = {
@@ -8,6 +8,7 @@ type VideoPlayerProps = {
 
 export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -16,6 +17,7 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
     if (file) {
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
+      setFileName(file.name);
     }
   };
 
@@ -31,17 +33,52 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
     }
   };
 
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (!videoRef.current) return;
+
+    const video = videoRef.current;
+    const SEEK_SECONDS = 5;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        video.currentTime = Math.max(0, video.currentTime - SEEK_SECONDS);
+        break;
+      case 'ArrowRight':
+        video.currentTime = Math.min(video.duration, video.currentTime + SEEK_SECONDS);
+        break;
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   return (
     <Paper sx={{ p: 2 }}>
       <Box sx={{ width: '100%', position: 'relative' }}>
         {videoUrl ? (
-          <video
-            ref={videoRef}
-            controls
-            style={{ width: '100%', maxHeight: '70vh' }}
-            src={videoUrl}
-            onTimeUpdate={handleTimeUpdate}
-          />
+          <>
+            <video
+              ref={videoRef}
+              controls
+              style={{ width: '100%', maxHeight: '70vh' }}
+              src={videoUrl}
+              onTimeUpdate={handleTimeUpdate}
+            />
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mt: 1,
+                color: 'text.secondary',
+                textAlign: 'left',
+              }}
+            >
+              {fileName}
+            </Typography>
+          </>
         ) : (
           <Box
             sx={{
