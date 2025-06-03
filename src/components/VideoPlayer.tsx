@@ -4,17 +4,44 @@ import type { ChangeEvent } from 'react';
 
 type VideoPlayerProps = {
   onTimeUpdate?: (currentTime: number) => void;
+  onSeek?: () => void;
 };
 
-export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
+export const VideoPlayer = ({ onTimeUpdate, onSeek }: VideoPlayerProps) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      const url = URL.createObjectURL(file);
+      setVideoUrl(url);
+      setFileName(file.name);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+
+    const file = event.dataTransfer.files[0];
+    if (file && (file.type.startsWith('video/') || file.type === 'video/webm' || file.name.endsWith('.mkv'))) {
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
       setFileName(file.name);
@@ -30,6 +57,12 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
       // 秒に変換
       const currentTimeSec = Math.floor(videoRef.current.currentTime);
       onTimeUpdate(currentTimeSec);
+    }
+  };
+
+  const handleSeeking = () => {
+    if (onSeek) {
+      onSeek();
     }
   };
 
@@ -58,7 +91,20 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
 
   return (
     <Paper sx={{ p: 2 }}>
-      <Box sx={{ width: '100%', position: 'relative' }}>
+      <Box 
+        sx={{ 
+          width: '100%', 
+          position: 'relative',
+          ...(isDragging && {
+            outline: '2px dashed',
+            outlineColor: 'primary.main',
+            backgroundColor: 'action.hover',
+          }),
+        }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         {videoUrl ? (
           <>
             <video
@@ -67,6 +113,7 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
               style={{ width: '100%', maxHeight: '70vh' }}
               src={videoUrl}
               onTimeUpdate={handleTimeUpdate}
+              onSeeking={handleSeeking}
             />
             <Typography 
               variant="body2" 
@@ -85,11 +132,19 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
               width: '100%',
               height: '70vh',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               bgcolor: 'background.paper',
+              gap: 2,
             }}
           >
+            <Typography variant="body1" color="text.secondary">
+              動画ファイルをドラッグ&ドロップ
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              または
+            </Typography>
             <Button variant="contained" onClick={handleUploadClick}>
               動画をアップロード
             </Button>
@@ -100,7 +155,7 @@ export const VideoPlayer = ({ onTimeUpdate }: VideoPlayerProps) => {
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="video/*"
+        accept="video/*,.webm,.mkv"
         style={{ display: 'none' }}
       />
     </Paper>

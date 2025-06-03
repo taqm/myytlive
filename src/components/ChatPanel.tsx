@@ -22,6 +22,8 @@ type ChatPanelProps = {
   messages: ChatMessage[];
   onChatFileLoad: (messages: ChatMessage[]) => void;
   currentTime?: number;
+  shouldScrollToBottom?: boolean;
+  onScrollComplete?: () => void;
 };
 
 const getSuperChatColors = (amount: string) => {
@@ -133,13 +135,20 @@ const formatSeconds = (seconds: number): string => {
   return `${pad(m)}:${pad(s)}`;
 };
 
-export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelProps) => {
+export const ChatPanel = ({ 
+  messages, 
+  onChatFileLoad, 
+  currentTime,
+  shouldScrollToBottom,
+  onScrollComplete,
+}: ChatPanelProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const [visibleMessages, setVisibleMessages] = useState<ChatMessage[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   // スクロール位置の監視
   const handleScroll = () => {
@@ -170,14 +179,72 @@ export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelPr
     const filtered = messages.filter(msg => msg.timestampSec <= currentTime);
     setVisibleMessages(filtered);
 
-    // 自動スクロールが有効な場合のみスクロール
-    if (autoScroll && chatBoxRef.current) {
+    // 自動スクロールが有効な場合またはシーク時にスクロール
+    if ((autoScroll || shouldScrollToBottom) && chatBoxRef.current) {
       chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+      if (shouldScrollToBottom && onScrollComplete) {
+        onScrollComplete();
+      }
     }
-  }, [currentTime, messages, autoScroll]);
+  }, [currentTime, messages, autoScroll, shouldScrollToBottom, onScrollComplete]);
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+      const chatData: ChatMessage[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        try {
+          const line = lines[i];
+          const data = JSON.parse(line);
+          const message = convertToChatMessage(data);
+
+          if (message) {
+            chatData.push(message);
+          } else {
+            console.warn(`行 ${i + 1} の解析に失敗しました:`, data);
+          }
+        } catch (error) {
+          console.warn(`行 ${i + 1} の解析に失敗しました:`, error);
+          continue;
+        }
+      }
+
+      if (chatData.length === 0) {
+        throw new Error('有効なチャットメッセージが見つかりませんでした。');
+      }
+
+      // タイムスタンプでソート
+      chatData.sort((a, b) => a.timestampSec - b.timestampSec);
+      onChatFileLoad(chatData);
+      setAutoScroll(true);
+    } catch (error) {
+      console.error('チャットファイルの読み込みに失敗しました:', error);
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+
+    const file = event.dataTransfer.files[0];
     if (!file) return;
 
     try {
@@ -251,8 +318,15 @@ export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelPr
         flexDirection: 'column',
         borderRadius: 1,
         position: 'relative',
+        ...(isDragging && {
+          outline: '2px dashed',
+          outlineColor: 'primary.main',
+        }),
       }}
       elevation={0}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <Box
         sx={{
@@ -304,6 +378,12 @@ export const ChatPanel = ({ messages, onChatFileLoad, currentTime }: ChatPanelPr
             }}
           >
             <UploadFileIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
+            <Typography variant="body1" color="text.secondary">
+              チャットファイルをドラッグ&ドロップ
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              または
+            </Typography>
             <Button
               variant="outlined"
               startIcon={<UploadFileIcon />}
