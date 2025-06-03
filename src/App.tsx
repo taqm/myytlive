@@ -11,26 +11,32 @@ const darkTheme = createTheme({
 
 function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentTime, setCurrentTime] = useState<number>(0);
 
   const handleChatFileLoad = (loadedMessages: ChatMessage[]) => {
     // タイムスタンプでソート
-    const sortedMessages = [...loadedMessages].sort((a, b) => a.timestamp - b.timestamp);
+    const sortedMessages = [...loadedMessages].sort((a, b) => a.timestampSec - b.timestampSec);
     setMessages(sortedMessages);
+  };
+
+  const handleTimeUpdate = (time: number) => {
+    setCurrentTime(time);
   };
 
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <Container maxWidth="xl">
-        <Box sx={{ mt: 4 }}>
+        <Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Box sx={{ flex: '1 1 70%' }}>
-              <VideoPlayer />
+              <VideoPlayer onTimeUpdate={handleTimeUpdate} />
             </Box>
             <Box sx={{ flex: '1 1 30%', minWidth: 350 }}>
               <ChatPanel 
                 messages={messages}
                 onChatFileLoad={handleChatFileLoad}
+                currentTime={currentTime}
               />
             </Box>
           </Box>
